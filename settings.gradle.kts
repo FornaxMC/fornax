@@ -12,9 +12,11 @@ pluginManagement {
     }
 
     val kmogusVersion: String by settings
+    val kotlinVersion: String by settings
 
     plugins {
         id("dev.luna5ama.kmogus-struct-plugin") version kmogusVersion
+        id("org.jetbrains.kotlin.plugin.serialization") version kotlinVersion
     }
 }
 
@@ -23,4 +25,4 @@ include("shared")
 //include("architectury-1.16.5", "architectury-1.16.5:common", "architectury-1.16.5:fabric", "architectury-1.16.5:forge")
 //include("architectury-1.18.2", "architectury-1.18.2:common", "architectury-1.18.2:fabric", "architectury-1.18.2:forge")
 //include("architectury-1.19.4", "architectury-1.19.4:common", "architectury-1.19.4:fabric", "architectury-1.19.4:forge")
-include("architectury-1.19.4", "architectury-1.19.4:common", "architectury-1.19.4:fabric")
+//include("architectury-1.19.4", "architectury-1.19.4:common", "architectury-1.19.4:fabric")

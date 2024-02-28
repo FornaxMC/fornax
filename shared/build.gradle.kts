@@ -1,3 +1,7 @@
+plugins {
+    kotlin("plugin.serialization")
+}
+
 dependencies {
     val kmogusVersion: String by project
     val glWrapperVersion: String by project
@@ -5,6 +9,8 @@ dependencies {
     modCore("dev.fastmc:fastmc-common:1.1-SNAPSHOT") {
         isTransitive = false
     }
+
+    modCore("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 
     modCore("dev.luna5ama:kmogus-core:$kmogusVersion")
     modCore("dev.luna5ama:kmogus-joml:$kmogusVersion")
@@ -22,4 +28,6 @@ dependencies {
     testRuntimeOnly("org.lwjgl", "lwjgl-glfw", classifier = "natives-windows")
     testRuntimeOnly("org.lwjgl", "lwjgl-opengl", classifier = "natives-windows")
     testRuntimeOnly("org.lwjgl", "lwjgl-stb", classifier = "natives-windows")
+
+    testImplementation("it.unimi.dsi:fastutil:8.5.12")
 }
