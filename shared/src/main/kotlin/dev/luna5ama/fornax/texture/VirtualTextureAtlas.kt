@@ -65,30 +65,8 @@ class VirtualTextureAtlas(val format: Int) :
 
     private val totalLevels = textureSize.countTrailingZeroBits() + 1
     private val quadTree = QuadTree<Block>()
-    private val levelBlockLists = Array(totalLevels) { OpenLinkedList(Block::levelBlockPtr) }
-
-        private val freeLists = Array(totalLevels) { OpenLinkedList(Block::freeListPtr) }
-//    private val freeLists = Array(totalLevels) { PriorityQueue<Block>(compareBy { it.id }) }
-
-    private fun PriorityQueue<Block>.pushBack(block: Block) {
-        add(block)
-    }
-
-    private fun PriorityQueue<Block>.pushFront(block: Block) {
-        add(block)
-    }
-
-    private fun PriorityQueue<Block>.popFront(): Block? {
-        return poll()
-    }
-
-    private fun PriorityQueue<Block>.remove(block: Block) {
-        remove(block)
-    }
-
-    private fun OpenLinkedList<Block>.pushBack(block: Block) {
-        pushBack(block)
-    }
+    private val levelBlockLists = Array(totalLevels) { OpenLinkedList(Block::prevLevel, Block::nextLevel) }
+        private val freeLists = Array(totalLevels) { OpenLinkedList(Block::prevFree, Block::nextFree) }
 
     init {
         val rootBlock = Block(null, 0, 0, 0, 0, textureSize)
@@ -103,12 +81,12 @@ class VirtualTextureAtlas(val format: Int) :
 
         var blockIter = levelBlockLists[gcBlockLevel].head
         while (blockIter != null) {
-            val fragmentV = blockIter.container.fragmentSize()
+            val fragmentV = blockIter.fragmentSize()
             if (fragmentV > maxFragV) {
                 maxFragV = fragmentV
-                maxFragmentBlock = blockIter.container
+                maxFragmentBlock = blockIter
             }
-            blockIter = blockIter.next
+            blockIter = blockIter.nextLevel
         }
 
         if (maxFragmentBlock != null) {
@@ -311,8 +289,10 @@ class VirtualTextureAtlas(val format: Int) :
         val offsetY: Int,
         val size: Int,
     ) : QuadTree.Node<Block>(parent) {
-        val freeListPtr = OpenLinkedList.NodePointer(this)
-        val levelBlockPtr = OpenLinkedList.NodePointer(this)
+        var prevFree: Block? = null
+        var nextFree: Block? = null
+        var prevLevel: Block? = null
+        var nextLevel: Block? = null
 
         var ref = BlockRef(this)
 

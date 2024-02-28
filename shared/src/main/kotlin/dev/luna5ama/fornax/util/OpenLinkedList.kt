@@ -1,43 +1,46 @@
 package dev.luna5ama.fornax.util
 
-import kotlin.reflect.KProperty1
+import kotlin.reflect.KMutableProperty1
 
-class OpenLinkedList<E>(private val ptrFunc: KProperty1<E, NodePointer<E>>) {
-    var head: NodePointer<E>? = null
-    var tail: NodePointer<E>? = null
+class OpenLinkedList<E>(prevPtr: KMutableProperty1<E, E?>, nextPtr: KMutableProperty1<E, E?>) {
+    var head: E? = null
+    var tail: E? = null
     var size = 0; private set
+    
+    private var E.prev by prevPtr
+    private var E.next by nextPtr
 
-    fun pushFront(container: E) {
+    fun pushFront(e: E) {
         assert(size >= 0)
-
-        val ptr = ptrFunc.get(container)
+        
+        val head =head
 
         if (head == null) {
-            tail = ptr
+            tail = e
         } else {
-            head!!.prev = ptr
-            ptr.next = head
+            head.prev = e
+            e.next = head
         }
 
-        head = ptr
+        this.head = e
         size++
 
         assert(size >= 0)
     }
 
-    fun pushBack(container: E) {
+    fun pushBack(e: E) {
         assert(size >= 0)
 
-        val ptr = ptrFunc.get(container)
+        val tail = tail
 
         if (tail == null) {
-            head = ptr
+            head = e
         } else {
-            tail!!.next = ptr
-            ptr.prev = tail
+            tail.next = e
+            e.prev = tail
         }
 
-        tail = ptr
+        this.tail = e
         size++
 
         assert(size >= 0)
@@ -46,57 +49,55 @@ class OpenLinkedList<E>(private val ptrFunc: KProperty1<E, NodePointer<E>>) {
     fun popFront(): E? {
         assert(size >= 0)
 
-        val ptr = head ?: return null
+        val head = head ?: return null
 
-        val next = ptr.next
+        val next = head.next
         if (next == null) {
-            head = null
+            this.head = null
             tail = null
         } else {
             next.prev = null
-            head = next
+            this.head = next
         }
 
-        ptr.next = null
+        head.next = null
         size--
 
         assert(size >= 0)
 
-        return ptr.container
+        return head
     }
 
     fun popBack(): E? {
         assert(size >= 0)
 
-        val ptr = tail ?: return null
+        val tail = tail ?: return null
 
-        val prev = ptr.prev
+        val prev = tail.prev
         if (prev == null) {
             head = null
-            tail = null
+            this.tail = null
         } else {
             prev.next = null
-            tail = prev
+            this.tail = prev
         }
 
-        ptr.prev = null
+        tail.prev = null
         size--
 
         assert(size >= 0)
 
-        return ptr.container
+        return tail
     }
 
-    fun remove(container: E) {
+    fun remove(e: E) {
         assert(size >= 0)
 
-        val ptr = ptrFunc.get(container)
+        val prev = e.prev
+        val next = e.next
 
-        val prev = ptr.prev
-        val next = ptr.next
-
-        val isHead = head == ptr
-        val isTail = tail == ptr
+        val isHead = head == e
+        val isTail = tail == e
 
         if (isHead && isTail) {
             assert(size == 1)
@@ -109,7 +110,7 @@ class OpenLinkedList<E>(private val ptrFunc: KProperty1<E, NodePointer<E>>) {
             assert(prev == null)
             assert(next != null)
             assert(size > 1)
-            assert(next!!.prev == ptr)
+            assert(next!!.prev == e)
 
             head = next
             next.prev = null
@@ -118,15 +119,15 @@ class OpenLinkedList<E>(private val ptrFunc: KProperty1<E, NodePointer<E>>) {
             assert(next == null)
             assert(prev != null)
             assert(size > 1)
-            assert(prev!!.next == ptr)
+            assert(prev!!.next == e)
 
             tail = prev
             prev.next = null
             size--
         } else if (prev != null && next != null) {
             assert(size > 2)
-            assert(prev.next == ptr)
-            assert(next.prev == ptr)
+            assert(prev.next == e)
+            assert(next.prev == e)
 
             prev.next = next
             next.prev = prev
@@ -135,12 +136,7 @@ class OpenLinkedList<E>(private val ptrFunc: KProperty1<E, NodePointer<E>>) {
             assert(prev == null && next == null)
         }
 
-        ptr.next = null
-        ptr.prev = null
-    }
-
-    class NodePointer<E>(val container: E) {
-        var next: NodePointer<E>? = null
-        var prev: NodePointer<E>? = null
+        e.next = null
+        e.prev = null
     }
 }
