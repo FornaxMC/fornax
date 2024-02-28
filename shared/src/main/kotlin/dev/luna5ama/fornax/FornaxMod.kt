@@ -18,8 +18,9 @@ object FornaxMod {
             File("fornax/config.properties").inputStream().use {
                 val prop = Properties()
                 prop.load(it)
+                val default = Config()
                 config = Config(
-                    virtualTextureAtlasSize = prop.getProperty("virtualTextureAtlasSize", "16384").toInt()
+                    virtualTextureAtlasSize = prop.getProperty("virtualTextureAtlasSize", default.virtualTextureAtlasSize.toString()).toInt()
                 )
             }
         } catch (e: IOException) {

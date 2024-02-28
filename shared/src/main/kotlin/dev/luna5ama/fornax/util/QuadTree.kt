@@ -1,7 +1,7 @@
 package dev.luna5ama.fornax.util
 
 class QuadTree<T : QuadTree.Node<T>> {
-    private var root: T? = null
+    var root: T? = null
 
     open class Node<T : Node<T>>(val parent: T?) {
         var c11: T? = null
