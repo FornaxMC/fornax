@@ -277,3 +277,5 @@ gradle-app.setting
 .architectury-transformer
 
 random/
+
+hs_err_*.log
