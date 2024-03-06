@@ -6,10 +6,12 @@ import dev.luna5ama.fornax.opengl.register
 import dev.luna5ama.fornax.util.OpenLinkedList
 import dev.luna5ama.fornax.util.QuadTree
 import dev.luna5ama.glwrapper.api.*
+import dev.luna5ama.glwrapper.impl.BufferObject
 import dev.luna5ama.glwrapper.impl.TextureObject
 import dev.luna5ama.glwrapper.impl.parameteri
 import dev.luna5ama.kmogus.Arr
 import dev.luna5ama.kmogus.MemoryStack
+import dev.luna5ama.kmogus.Ptr
 import java.util.*
 
 class VirtualTextureAtlas(val format: Int) :
@@ -23,7 +25,7 @@ class VirtualTextureAtlas(val format: Int) :
     }
 
     val sparseTexture = FornaxMod.config.sparseTexture
-    val texture = register(TextureObject.Texture2D(GL_TEXTURE_2D))
+    val textureObject = register(TextureObject.Texture2D(GL_TEXTURE_2D))
     val pageSize: Int
 
     init {
@@ -54,12 +56,12 @@ class VirtualTextureAtlas(val format: Int) :
 
             pageSize = minSize
 
-            texture.parameteri(GL_TEXTURE_SPARSE_ARB, GL_TRUE)
+            textureObject.parameteri(GL_TEXTURE_SPARSE_ARB, GL_TRUE)
                 .parameteri(GL_VIRTUAL_PAGE_SIZE_INDEX_ARB, idx)
                 .allocate(1, format, textureSize, textureSize)
         } else {
             pageSize = -1
-            texture.allocate(1, format, textureSize, textureSize)
+            textureObject.allocate(1, format, textureSize, textureSize)
         }
     }
 
@@ -93,7 +95,7 @@ class VirtualTextureAtlas(val format: Int) :
             val collected = Array(totalLevels - gcBlockLevel) { mutableListOf<Block>() }
             collectBlock(collected, maxFragmentBlock)
 
-            val targetBlock = allocate(gcBlockLevel)!!.block
+            val targetBlock = allocate0(gcBlockLevel)!!.block
             val localFreeList = Array(totalLevels - gcBlockLevel) { ArrayDeque<Block>() }
             localFreeList[0].add(targetBlock)
 
@@ -131,8 +133,8 @@ class VirtualTextureAtlas(val format: Int) :
                     assert(blockDst.level == srcIdx + gcBlockLevel)
                     assert(blockSrc.size == blockDst.size)
 
-                    texture.copyTo(
-                        texture, 0, blockSrc.offsetX, blockSrc.offsetY,
+                    textureObject.copyTo(
+                        textureObject, 0, blockSrc.offsetX, blockSrc.offsetY,
                         0, blockDst.offsetX, blockDst.offsetY,
                         blockSrc.size, blockSrc.size
                     )
@@ -141,7 +143,7 @@ class VirtualTextureAtlas(val format: Int) :
                     blockSrc.ref = BlockRef(blockSrc)
                     blockDst.ref = srcRef
 
-                    free(blockSrc)
+                    blockSrc.free()
                 }
             }
         }
@@ -172,7 +174,11 @@ class VirtualTextureAtlas(val format: Int) :
         return idx
     }
 
-    fun allocate(idx: Int): BlockRef? {
+    fun allocate(size: Int): BlockRef? {
+        return allocate0(idxForSize(size))
+    }
+
+    private fun allocate0(idx: Int): BlockRef? {
         var block = freeLists[idx].popFront()
 
         if (block == null) {
@@ -200,34 +206,6 @@ class VirtualTextureAtlas(val format: Int) :
             .setByteInc(0)
             .setByteInc(-1)
             .setByteInc(-1)
-    }
-
-    fun free(blockRef: BlockRef) {
-        val block = blockRef.block
-        free(block)
-    }
-
-    private fun free(block: Block) {
-        block.state = BlockState.FREE
-        val combined = combine(block)
-        if (combined.size >= pageSize) {
-            combined.commit(false)
-            freeLists[combined.level].pushBack(combined)
-        } else {
-            glClearTexSubImage(
-                texture.id,
-                0,
-                combined.offsetX,
-                combined.offsetY,
-                0,
-                combined.size,
-                combined.size,
-                1,
-                GL_RGBA,
-                GL_UNSIGNED_BYTE,
-                clearPtr.ptr
-            )
-        }
     }
 
     private fun combine(block: Block): Block {
@@ -279,9 +257,40 @@ class VirtualTextureAtlas(val format: Int) :
     private val Block?.isNullorFree: Boolean
         get() = this == null || state == BlockState.FREE
 
-    class BlockRef(var block: Block)
+    inner class BlockRef internal constructor(internal var block: Block) {
+        val textureObject get() = this@VirtualTextureAtlas.textureObject
+        val level get() = block.level
+        val offsetX get() = block.offsetX
+        val offsetY get() = block.offsetY
+        val size get() = block.size
 
-    inner class Block(
+        fun free() {
+            block.free()
+        }
+
+        fun invalidate() {
+         textureObject.invalidate(0, offsetX, offsetY, size, size)
+        }
+
+        fun upload(
+            format: Int,
+            type: Int,
+            buffer: BufferObject,
+            offset: Long
+        ) {
+            textureObject.upload(0, offsetX, offsetY, size, size, format, type, buffer, offset)
+        }
+
+        fun upload(
+            format: Int,
+            type: Int,
+            ptr: Ptr
+        ) {
+            textureObject.upload(0, offsetX, offsetY, size, size, format, type, ptr)
+        }
+    }
+
+    internal inner class Block(
         parent: Block?,
         val id: Int,
         val level: Int,
@@ -358,7 +367,7 @@ class VirtualTextureAtlas(val format: Int) :
             freeLists[level].remove(this)
         }
 
-        fun commit(commit: Boolean) {
+        internal fun commit(commit: Boolean) {
             if (!sparseTexture) return
 
             var block = this
@@ -372,7 +381,7 @@ class VirtualTextureAtlas(val format: Int) :
                 block.c22?.commit = commit
             }
             glTexturePageCommitmentEXT(
-                texture.id,
+                textureObject.id,
                 0,
                 block.offsetX,
                 block.offsetY,
@@ -382,6 +391,29 @@ class VirtualTextureAtlas(val format: Int) :
                 1,
                 commit
             )
+        }
+
+        fun free() {
+            this.state = BlockState.FREE
+            val combined = combine(this)
+            if (combined.size >= pageSize) {
+                combined.commit(false)
+                freeLists[combined.level].pushBack(combined)
+            } else {
+                glClearTexSubImage(
+                    textureObject.id,
+                    0,
+                    combined.offsetX,
+                    combined.offsetY,
+                    0,
+                    combined.size,
+                    combined.size,
+                    1,
+                    GL_RGBA,
+                    GL_UNSIGNED_BYTE,
+                    clearPtr.ptr
+                )
+            }
         }
     }
 

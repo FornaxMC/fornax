@@ -1,12 +1,13 @@
 package dev.luna5ama.fornax.opengl
 
+import dev.luna5ama.fornax.IUpdateListener
 import dev.luna5ama.glwrapper.api.*
-import java.util.ArrayDeque
+import java.util.*
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
-class FrameStamps {
+class FrameStamps : IUpdateListener {
     private val lock = ReentrantReadWriteLock()
     private val stamps = ArrayDeque<StampImpl>()
 
@@ -14,6 +15,14 @@ class FrameStamps {
     private var currentStamp0 = StampImpl()
 
     val currentStamp: Stamp get() = lock.read { currentStamp0 }
+
+    override suspend fun onPreRender() {
+        update()
+    }
+
+    override suspend fun onPostRender() {
+        update()
+    }
 
     fun update() {
         val last = lock.write {

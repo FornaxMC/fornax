@@ -11,8 +11,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
-class PMappedRingBuffer(private val capacity: Long, private val stamper: FrameStamps, frag: Int) {
-    private val buffer = BufferObject.Immutable()
+class PMappedRingBuffer(private val capacity: Long, private val stamper: FrameStamps, frag: Int)
+    : IGLObjContainer by IGLObjContainer.Impl() {
+    private val buffer = register(BufferObject.Immutable())
         .allocate(capacity, GL_MAP_PERSISTENT_BIT or frag)
         .label("PMappedRingBuffer#${System.identityHashCode(this)}}")
     val mapped = buffer.map(GL_MAP_PERSISTENT_BIT or GL_MAP_UNSYNCHRONIZED_BIT or frag)
@@ -81,7 +82,15 @@ class PMappedRingBuffer(private val capacity: Long, private val stamper: FrameSt
         allocatedFrames.addLast(last)
     }
 
-    fun allocate(size: Long): Block? {
+    fun allocate(size: Long): Block {
+        var block: Block?
+        do {
+            block = tryAllocate(size)
+        } while (block == null)
+        return block
+    }
+
+    fun tryAllocate(size: Long): Block? {
         rwLock.read {
             val frame = currentFrame
             var globalOffset: Long
@@ -107,10 +116,11 @@ class PMappedRingBuffer(private val capacity: Long, private val stamper: FrameSt
         val size: Long
     ) {
         init {
+            require(offset + size <= capacity) { "Block out of range" }
             frame.allocateCounter.incrementAndGet()
         }
 
-        val buffer: BufferObject
+        val bufferObject: BufferObject
             get() = this@PMappedRingBuffer.buffer
 
         val ptr = mapped.ptr + offset

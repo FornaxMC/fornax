@@ -4,11 +4,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class SBlockModel(
-    val parent: ResourceRefernce? = null,
+    val parent: ResourceReference? = null,
 //    val gui_light: String? = null,
 //    val display: Map<Display.Position, Display>? = null,
     val ambientocclusion: Boolean = true,
-    val textures: Map<String, ResourceRefernce>? = null,
+    val textures: Map<String, ResourceReference>? = null,
     val elements: List<Element>? = null
 ) {
     @Serializable

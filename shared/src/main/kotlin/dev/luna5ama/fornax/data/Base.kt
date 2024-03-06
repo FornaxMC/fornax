@@ -13,6 +13,8 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.listSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import java.net.URI
+import java.util.*
 
 @Serializable(with = SVec2.Serializer::class)
 data class SVec2(
@@ -77,27 +79,67 @@ data class SVec4(
     }
 }
 
-@Serializable(with = ResourceRefernce.Serializer::class)
-data class ResourceRefernce(
-    val namespace: String = "minecraft",
+@Serializable(with = ResourceReference.Serializer::class)
+data class ResourceReference(
+    val namespace: String,
     val path: String
 ) {
-    object Serializer : KSerializer<ResourceRefernce> {
-        override val descriptor: SerialDescriptor =
-            PrimitiveSerialDescriptor("ResourceRefernce", PrimitiveKind.STRING)
+    constructor(path: String) : this("minecraft", path)
 
-        override fun serialize(encoder: Encoder, value: ResourceRefernce) {
+    @Transient
+    private var cached: URI? = null
+    fun resolve(): URI {
+        var v = cached
+        if (v === null) {
+            v = resolvers.asSequence()
+                .mapNotNull { it.resolve(this) }
+                .firstOrNull()
+                ?: throw IllegalStateException("Resource not found: $this")
+
+            cached = v
+        }
+        return v
+    }
+
+    object Serializer : KSerializer<ResourceReference> {
+        override val descriptor: SerialDescriptor =
+            PrimitiveSerialDescriptor("ResourceReference", PrimitiveKind.STRING)
+
+        override fun serialize(encoder: Encoder, value: ResourceReference) {
             encoder.encodeString("${value.namespace}:${value.path}")
         }
 
-        override fun deserialize(decoder: Decoder): ResourceRefernce {
+        override fun deserialize(decoder: Decoder): ResourceReference {
             val split = decoder.decodeString().split(":")
             return if (split.size == 1) {
-                ResourceRefernce(path = split[0])
+                ResourceReference(path = split[0])
             } else {
-                ResourceRefernce(split[0], split[1])
+                ResourceReference(split[0], split[1])
             }
         }
+    }
+
+    private companion object {
+        val resolvers by lazy {
+            ServiceLoader.load(PathResolver::class.java).sortedDescending()
+        }
+    }
+}
+
+interface PathResolver : Comparable<PathResolver> {
+    val priority: Int
+    fun resolve(ref: ResourceReference): URI?
+
+    override fun compareTo(other: PathResolver): Int {
+        return priority.compareTo(other.priority)
+    }
+}
+
+class DefaultPathResolver : PathResolver {
+    override val priority
+        get() = 0
+    override fun resolve(ref: ResourceReference): URI? {
+        return javaClass.getResource("/assets/${ref.namespace}/${ref.path}")?.toURI()
     }
 }
 
