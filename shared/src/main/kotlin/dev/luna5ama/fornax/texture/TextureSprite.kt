@@ -91,7 +91,7 @@ data class TextureSprite(val ref: ResourceReference) {
                 return if (animationMeta.frames == null) {
                     (frameTime % totalFrames).toInt()
                 } else {
-                    animationMeta.frames[frameTime.toInt() % animationMeta.frames.size]
+                    animationMeta.frames[(frameTime % animationMeta.frames.size).toInt()]
                 }
             }
 
@@ -110,8 +110,8 @@ data class TextureSprite(val ref: ResourceReference) {
                 val yIndex1 = getFrameYIndex(floor(frameTimeD).toLong())
                 val yIndex2 = getFrameYIndex(ceil(frameTimeD).toLong())
                 val mixRatio = frameTimeD - floor(frameTimeD)
-                val mul1 = (mixRatio * MIX_MUL).toInt()
-                val mul2 = MIX_MUL - mul1
+                val mul2 = (mixRatio * MIX_MUL).toInt()
+                val mul1 = MIX_MUL - mul2
                 return textureData.images.asSequence()
                     .mapIndexed { level, it ->
                         val mipLevelSize = it.width.toLong() * it.width * it.channels
@@ -124,7 +124,7 @@ data class TextureSprite(val ref: ResourceReference) {
                         for (i in 0 until mipLevelSize) {
                             val v1 = readPtr1.getByte().toInt() and 0xFF
                             val v2 = readPtr2.getByte().toInt() and 0xFF
-                            val v = (v1 * mul1 + v2 * mul2) / MIX_DIV
+                            val v = (v1 * mul1 + v2 * mul2) / MIX_MUL
                             assert(v in 0..255)
                             writePtr.setByte(v.toByte())
                             readPtr1++
@@ -142,8 +142,7 @@ data class TextureSprite(val ref: ResourceReference) {
             ignoreUnknownKeys = true
             isLenient = true
         }
-        private const val MIX_MUL = 4194304
-        private const val MIX_DIV = MIX_MUL * 2
+        private const val MIX_MUL = 8388608
     }
 
     data class PendingUpdateData(
