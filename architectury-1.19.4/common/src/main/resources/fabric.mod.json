@@ -1,0 +1,23 @@
+{
+    "schemaVersion": 1,
+    "id": "fornax",
+    "version": "${version}",
+    "name": "Fornax",
+    "description": "Modern render pipeline for Minecraft",
+    "authors": [
+        "Luna5ama"
+    ],
+    "contact": {},
+    "license": "GPL v3",
+    "icon": "assets/fastmc/icon.png",
+    "environment": "client",
+    "mixins": [
+        "mixins.fornax-accessor.json",
+        "mixins.fornax-core.json"
+    ],
+    "accessWidener": "fornax.accesswidener",
+    "depends": {
+        "fabricloader": ">=0.11",
+        "minecraft": "1.19.4"
+    }
+}
