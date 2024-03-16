@@ -276,6 +276,6 @@ gradle-app.setting
 
 .architectury-transformer
 
-random/
+test/random/
 
 hs_err_*.log
