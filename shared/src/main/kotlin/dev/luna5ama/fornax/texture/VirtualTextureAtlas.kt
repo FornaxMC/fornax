@@ -68,7 +68,7 @@ class VirtualTextureAtlas(val format: Int) :
     private val totalLevels = textureSize.countTrailingZeroBits() + 1
     private val quadTree = QuadTree<Block>()
     private val levelBlockLists = Array(totalLevels) { OpenLinkedList(Block::prevLevel, Block::nextLevel) }
-        private val freeLists = Array(totalLevels) { OpenLinkedList(Block::prevFree, Block::nextFree) }
+    private val freeLists = Array(totalLevels) { OpenLinkedList(Block::prevFree, Block::nextFree) }
 
     init {
         val rootBlock = Block(null, 0, 0, 0, 0, textureSize)
@@ -269,7 +269,7 @@ class VirtualTextureAtlas(val format: Int) :
         }
 
         fun invalidate() {
-         textureObject.invalidate(0, offsetX, offsetY, size, size)
+            textureObject.invalidate(0, offsetX, offsetY, size, size)
         }
 
         fun upload(

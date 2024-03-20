@@ -80,7 +80,7 @@ data class TextureSprite(val ref: ResourceReference) {
                 .mapIndexed { level, it ->
                     val mipLevelSize = it.data.len
                     val block = buffer.allocate(mipLevelSize)
-                    memcpy(it.data.ptr, block.ptr, mipLevelSize)
+                    memcpy(it.data.ptr, 0L, block.ptr, 0L, mipLevelSize)
                     PendingUpdateData(textureData, this, level, it.width, block)
                 }
         } else {

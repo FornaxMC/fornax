@@ -1,9 +1,6 @@
 package dev.luna5ama.fornax
 
-import dev.luna5ama.fornax.opengl.FrameStamps
-import dev.luna5ama.fornax.opengl.IGLObjContainer
-import dev.luna5ama.fornax.opengl.PMappedRingBuffer
-import dev.luna5ama.fornax.opengl.register
+import dev.luna5ama.fornax.opengl.*
 import dev.luna5ama.fornax.terrain.TerrainRenderer
 import dev.luna5ama.fornax.texture.TextureManager
 import dev.luna5ama.glwrapper.api.GL_MAP_COHERENT_BIT
@@ -13,7 +10,7 @@ import kotlin.coroutines.CoroutineContext
 
 class ModInstance : IGLObjContainer by IGLObjContainer.Impl(), IUpdateListener {
     val globalScope = CoroutineScope(Dispatchers.Default)
-    val samplers = register(Samplers())
+    val samplerManager = register(SamplerManager())
     val frameStamps = FrameStamps()
     val terrainRenderer = register(TerrainRenderer())
     val textureManager = register(TextureManager(this))

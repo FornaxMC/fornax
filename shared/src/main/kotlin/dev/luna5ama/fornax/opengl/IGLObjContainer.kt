@@ -18,7 +18,7 @@ interface IGLObjContainer {
     fun <T : IGLObject> register0(obj: T): T
     fun <T : IGLObjContainer> register0(container: T): T
     fun destroy()
-    fun collectObjs(output: EnumMap<GLObjectType, MutableSet<IGLObject>>)
+    fun collectObjs(output: MutableMap<GLObjectType, MutableSet<IGLObject>>)
     fun clearObjs()
 
     class Impl : IGLObjContainer {
@@ -35,7 +35,7 @@ interface IGLObjContainer {
             return container
         }
 
-        override fun collectObjs(output: EnumMap<GLObjectType, MutableSet<IGLObject>>) {
+        override fun collectObjs(output: MutableMap<GLObjectType, MutableSet<IGLObject>>) {
             objs.forEach {
                 output.getOrPut(it.type, ::mutableSetOf).add(it)
             }
@@ -49,7 +49,7 @@ interface IGLObjContainer {
         }
 
         override fun destroy() {
-            val objs = EnumMap<GLObjectType, MutableSet<IGLObject>>(GLObjectType::class.java)
+            val objs = mutableMapOf<GLObjectType, MutableSet<IGLObject>>()
             collectObjs(objs)
             objs.forEach { _, v ->
                 v.forEach {
