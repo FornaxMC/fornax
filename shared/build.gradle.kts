@@ -1,5 +1,6 @@
 plugins {
     kotlin("plugin.serialization")
+    id("dev.luna5ama.kmogus-struct-codegen").version("1.1-SNAPSHOT")
 }
 
 dependencies {
@@ -30,4 +31,5 @@ dependencies {
     testRuntimeOnly("org.lwjgl", "lwjgl-stb", classifier = "natives-windows")
 
     testImplementation("it.unimi.dsi:fastutil:8.5.12")
+    testImplementation("it.unimi.dsi:dsiutils:2.7.3")
 }
