@@ -1,6 +1,10 @@
 package dev.luna5ama.fornax.opengl
 
 import dev.luna5ama.glwrapper.api.*
+import dev.luna5ama.glwrapper.enums.CompareFunc
+import dev.luna5ama.glwrapper.enums.CompareMode
+import dev.luna5ama.glwrapper.enums.FilterMode
+import dev.luna5ama.glwrapper.enums.WrapMode
 import dev.luna5ama.glwrapper.objects.SamplerObject
 
 class SamplerManager(private val delegate: IGLObjContainer) : IGLObjContainer by delegate {
