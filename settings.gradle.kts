@@ -8,15 +8,21 @@ pluginManagement {
         maven("https://maven.architectury.dev/")
         maven("https://files.minecraftforge.net/maven/")
         maven("https://repo.spongepowered.org/repository/maven-public/")
-        mavenLocal()
     }
 
     val kmogusVersion: String by settings
     val kotlinVersion: String by settings
 
     plugins {
-        id("dev.luna5ama.kmogus-struct-plugin") version kmogusVersion
+        id("dev.luna5ama.kmogus-struct-codegen") version kmogusVersion
         id("org.jetbrains.kotlin.plugin.serialization") version kotlinVersion
+    }
+}
+
+includeBuild("../gl-wrapper") {
+    dependencySubstitution {
+        substitute(module("dev.luna5ama:gl-wrapper-core")).using(project(":shared"))
+        substitute(module("dev.luna5ama:gl-wrapper-lwjgl-3")).using(project(":lwjgl-3"))
     }
 }
 

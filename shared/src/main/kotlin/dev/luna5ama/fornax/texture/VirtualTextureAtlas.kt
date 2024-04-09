@@ -6,15 +6,15 @@ import dev.luna5ama.fornax.opengl.register
 import dev.luna5ama.fornax.util.OpenLinkedList
 import dev.luna5ama.fornax.util.QuadTree
 import dev.luna5ama.glwrapper.api.*
-import dev.luna5ama.glwrapper.impl.BufferObject
-import dev.luna5ama.glwrapper.impl.TextureObject
-import dev.luna5ama.glwrapper.impl.parameteri
+import dev.luna5ama.glwrapper.enums.ImageFormat
+import dev.luna5ama.glwrapper.objects.BufferObject
+import dev.luna5ama.glwrapper.objects.TextureObject
 import dev.luna5ama.kmogus.Arr
 import dev.luna5ama.kmogus.MemoryStack
 import dev.luna5ama.kmogus.Ptr
 import java.util.*
 
-class VirtualTextureAtlas(val format: Int) :
+class VirtualTextureAtlas(val format: ImageFormat.Sized) :
     IGLObjContainer by IGLObjContainer.Impl() {
 
     val textureSize = FornaxMod.config.virtualTextureAtlasSize
@@ -25,12 +25,12 @@ class VirtualTextureAtlas(val format: Int) :
     }
 
     val sparseTexture = FornaxMod.config.sparseTexture
-    val textureObject = register(TextureObject.Texture2D(GL_TEXTURE_2D))
+    val textureObject = register(TextureObject.Texture2D())
     val pageSize: Int
 
     init {
         if (sparseTexture) {
-            val n = glGetInternalformati(GL_TEXTURE_2D, format, GL_NUM_VIRTUAL_PAGE_SIZES_ARB)
+            val n = glGetInternalformati(GL_TEXTURE_2D, format.value, GL_NUM_VIRTUAL_PAGE_SIZES_ARB)
             var idx = -1
             var minSize = Int.MAX_VALUE
 
@@ -38,8 +38,8 @@ class VirtualTextureAtlas(val format: Int) :
                 val xSize = malloc(4L * n).ptr
                 val ySize = malloc(4L * n).ptr
 
-                glGetInternalformativ(GL_TEXTURE_2D, format, GL_VIRTUAL_PAGE_SIZE_X_ARB, n, xSize)
-                glGetInternalformativ(GL_TEXTURE_2D, format, GL_VIRTUAL_PAGE_SIZE_Y_ARB, n, ySize)
+                glGetInternalformativ(GL_TEXTURE_2D, format.value, GL_VIRTUAL_PAGE_SIZE_X_ARB, n, xSize)
+                glGetInternalformativ(GL_TEXTURE_2D, format.value, GL_VIRTUAL_PAGE_SIZE_Y_ARB, n, ySize)
 
                 for (i in 0 until n) {
                     val x = xSize.getInt(i * 4L)
@@ -56,9 +56,11 @@ class VirtualTextureAtlas(val format: Int) :
 
             pageSize = minSize
 
-            textureObject.parameteri(GL_TEXTURE_SPARSE_ARB, GL_TRUE)
-                .parameteri(GL_VIRTUAL_PAGE_SIZE_INDEX_ARB, idx)
-                .allocate(1, format, textureSize, textureSize)
+            textureObject.apply {
+                parameteri(GL_TEXTURE_SPARSE_ARB, GL_TRUE)
+                   parameteri(GL_VIRTUAL_PAGE_SIZE_INDEX_ARB, idx)
+                    allocate(1, format, textureSize, textureSize)
+            }
         } else {
             pageSize = -1
             textureObject.allocate(1, format, textureSize, textureSize)

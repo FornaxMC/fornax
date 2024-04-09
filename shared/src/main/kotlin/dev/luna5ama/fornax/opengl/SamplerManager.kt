@@ -1,10 +1,7 @@
 package dev.luna5ama.fornax.opengl
 
 import dev.luna5ama.glwrapper.api.*
-import dev.luna5ama.glwrapper.impl.SamplerObject
-import dev.luna5ama.glwrapper.impl.parameterf
-import dev.luna5ama.glwrapper.impl.parameterfv
-import dev.luna5ama.glwrapper.impl.parameteri
+import dev.luna5ama.glwrapper.objects.SamplerObject
 
 class SamplerManager(private val delegate: IGLObjContainer) : IGLObjContainer by delegate {
     constructor() : this(IGLObjContainer.Impl())

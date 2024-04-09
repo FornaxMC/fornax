@@ -8,6 +8,7 @@ import dev.luna5ama.fornax.opengl.IGLObjContainer
 import dev.luna5ama.fornax.opengl.register
 import dev.luna5ama.fornax.util.sendTo
 import dev.luna5ama.glwrapper.api.GL_RGBA8
+import dev.luna5ama.glwrapper.enums.ImageFormat
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
@@ -16,7 +17,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.coroutines.CoroutineContext
 
 class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.Impl(), IUpdateListener {
-    val atlas = register(VirtualTextureAtlas(GL_RGBA8))
+    val atlas = register(VirtualTextureAtlas(ImageFormat.R8_G8_B8_A8_UN))
     private val sprites0 = ConcurrentHashMap<ResourceReference, TextureSprite>()
     val sprites: Map<ResourceReference, TextureSprite> get() = sprites0
     private val animatedSprites = CopyOnWriteArrayList<TextureSprite>()

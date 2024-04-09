@@ -1,10 +1,12 @@
 package dev.luna5ama.fornax.opengl
 
 import dev.luna5ama.glwrapper.api.*
-import dev.luna5ama.glwrapper.impl.BufferObject
+import dev.luna5ama.glwrapper.objects.BufferObject
 
 class SparseBufferArena(private val maxSize: Long) : IGLObjContainer by IGLObjContainer.Impl() {
-    private val buffer = register(BufferObject.Immutable().allocate(maxSize, GL_SPARSE_STORAGE_BIT_ARB))
+    private val buffer = register(BufferObject.Immutable()).apply {
+        allocate(maxSize, GL_SPARSE_STORAGE_BIT_ARB)
+    }
     private var capacity = 0L
     private val freeList = arrayOfNulls<Block>(32)
 

@@ -1,6 +1,6 @@
 plugins {
     kotlin("plugin.serialization")
-    id("dev.luna5ama.kmogus-struct-codegen").version("1.1-SNAPSHOT")
+    id("dev.luna5ama.kmogus-struct-codegen")
 }
 
 dependencies {

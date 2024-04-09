@@ -1,10 +1,9 @@
 package dev.luna5ama.fornax.opengl
 
-import dev.luna5ama.glwrapper.impl.GLObjectType
-import dev.luna5ama.glwrapper.impl.IGLObject
+import dev.luna5ama.glwrapper.enums.GLObjectType
+import dev.luna5ama.glwrapper.objects.IGLObject
 import dev.luna5ama.kmogus.MemoryStack
 import dev.luna5ama.kmogus.ensureCapacity
-import java.util.*
 
 fun <T : IGLObject> IGLObjContainer.register(obj: T): T {
     return register0(obj)

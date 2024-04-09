@@ -2,8 +2,7 @@ package dev.luna5ama.fornax.opengl
 
 import dev.luna5ama.glwrapper.api.GL_MAP_PERSISTENT_BIT
 import dev.luna5ama.glwrapper.api.GL_MAP_UNSYNCHRONIZED_BIT
-import dev.luna5ama.glwrapper.impl.BufferObject
-import dev.luna5ama.glwrapper.impl.label
+import dev.luna5ama.glwrapper.objects.BufferObject
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -13,9 +12,10 @@ import kotlin.concurrent.write
 
 class PMappedRingBuffer(private val capacity: Long, private val stamper: FrameStamps, frag: Int)
     : IGLObjContainer by IGLObjContainer.Impl() {
-    private val buffer = register(BufferObject.Immutable())
-        .allocate(capacity, GL_MAP_PERSISTENT_BIT or frag)
-        .label("PMappedRingBuffer#${System.identityHashCode(this)}}")
+    private val buffer = register(BufferObject.Immutable()).apply {
+        allocate(capacity, GL_MAP_PERSISTENT_BIT or frag)
+        label("PMappedRingBuffer#${System.identityHashCode(this)}}")
+    }
     val mapped = buffer.map(GL_MAP_PERSISTENT_BIT or GL_MAP_UNSYNCHRONIZED_BIT or frag)
 
     private val allocatedFrames = ArrayDeque<AllocationFrame>()

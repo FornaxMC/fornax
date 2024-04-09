@@ -31,7 +31,6 @@ subprojects {
         mavenCentral()
         maven("https://maven.luna5ama.dev/")
         maven("https://libraries.minecraft.net/")
-        mavenLocal()
     }
 
     dependencies {
