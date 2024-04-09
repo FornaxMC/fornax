@@ -18,10 +18,13 @@ High performance modern render engine for Minecraft
         - [ ] Quad sorting
         - [ ] Chunk sorting
     - [ ] Drawing
+        - [ ] Unified geometry data buffer
+        - [ ] Shared quad data
         - [ ] Visibility buffer rendering
         - [ ] Regular hardware rasterization
         - [ ] Software rasterization for low LOD chunks
         - [ ] Velocity buffer
+        - [ ] Mesh shader draw pipeline
 
 
 - [ ] Entity draw pipeline
@@ -34,16 +37,20 @@ High performance modern render engine for Minecraft
 - [ ] Lighting pipeline
     - [ ] Global lights
     - [ ] Block lights
-    - [ ] Shadow mapping
+    - [ ] Shadows
       - [ ] RTWSM (Rectilinear Texture Warping Shadow Maps)
-      - [ ] Cloud shadows
       - [ ] RSM (Reflective Shadow Maps)
+      - [ ] Screen-space shadows
+      - [ ] Variable penumbra shadows
+      - [ ] Cloud shadows
+      - [ ] Block lights shadows?
     - [ ] Deferred lighting
     - [ ] PBR (GGX) direct lighting
     - [ ] RSM GI
     - [ ] [SSILVB](https://arxiv.org/pdf/2301.11376.pdf) + [LSAO](http://wili.cc/research/lsao/lsao.pdf)
     - [ ] Virtual point light GI
     - [ ] Atmospheric scattering (Egor Yusov, High Performance Outdoor Light Scattering Using Epipolar Sampling, GPU Pro 5)
+    - [ ] Per-chunk environment maps?
 
 
 - [ ] Post-processing pipeline
