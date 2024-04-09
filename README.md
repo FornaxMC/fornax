@@ -1,6 +1,8 @@
 # fornax
 
-High performance modern render engine for Minecraft
+(WIP) High performance modern render engine for Minecraft
+
+This project is in (really) early development stage. It is not ready for use (and mostly likely to be completely broken).
 
 ## Development
 
