@@ -10,11 +10,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
 
-class PMappedRingBuffer(private val capacity: Long, private val stamper: FrameStamps, frag: Int)
+class PersistentRingBuffer(private val capacity: Long, private val stamper: FrameStamps, frag: Int)
     : IGLObjContainer by IGLObjContainer.Impl() {
     private val buffer = register(BufferObject.Immutable()).apply {
         allocate(capacity, GL_MAP_PERSISTENT_BIT or frag)
-        label("PMappedRingBuffer#${System.identityHashCode(this)}}")
+        label("PersistentRingBuffer#${System.identityHashCode(this)}}")
     }
     val mapped = buffer.map(GL_MAP_PERSISTENT_BIT or GL_MAP_UNSYNCHRONIZED_BIT or frag)
 
@@ -121,7 +121,7 @@ class PMappedRingBuffer(private val capacity: Long, private val stamper: FrameSt
         }
 
         val bufferObject: BufferObject
-            get() = this@PMappedRingBuffer.buffer
+            get() = this@PersistentRingBuffer.buffer
 
         val ptr = mapped.ptr + offset
 

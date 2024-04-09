@@ -2,7 +2,7 @@ package dev.luna5ama.fornax.texture
 
 import dev.luna5ama.fornax.data.ResourceReference
 import dev.luna5ama.fornax.data.STexture
-import dev.luna5ama.fornax.opengl.PMappedRingBuffer
+import dev.luna5ama.fornax.opengl.PersistentRingBuffer
 import dev.luna5ama.kmogus.memcpy
 import kotlinx.serialization.json.Json
 import java.io.FileNotFoundException
@@ -73,7 +73,7 @@ data class TextureSprite(val ref: ResourceReference) {
         return data
     }
 
-    suspend fun getFrame(buffer: PMappedRingBuffer, tickIndex: Long): Sequence<PendingUpdateData> {
+    suspend fun getFrame(buffer: PersistentRingBuffer, tickIndex: Long): Sequence<PendingUpdateData> {
         val textureData = loadTextureData()
         if (animationMeta == null) {
             return textureData.images.asSequence()
@@ -150,7 +150,7 @@ data class TextureSprite(val ref: ResourceReference) {
         val sprite: TextureSprite,
         val level: Int,
         val imageSize: Int,
-        val dataBufferBlock: PMappedRingBuffer.Block
+        val dataBufferBlock: PersistentRingBuffer.Block
     ) {
         val channels get() = dataSrc.channels
         val glFormat get() = dataSrc.glFormat

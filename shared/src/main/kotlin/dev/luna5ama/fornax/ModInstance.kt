@@ -15,7 +15,7 @@ class ModInstance : IGLObjContainer by IGLObjContainer.Impl(), IUpdateListener {
     val terrainRenderer = register(TerrainRenderer())
     val textureManager = register(TextureManager(this))
     val globalUploadBuffer =
-        register(PMappedRingBuffer(1024L * 1024 * 1024 * 2, frameStamps, GL_MAP_COHERENT_BIT or GL_MAP_WRITE_BIT))
+        register(PersistentRingBuffer(1024L * 1024 * 1024 * 2, frameStamps, GL_MAP_COHERENT_BIT or GL_MAP_WRITE_BIT))
 
     override suspend fun onPreTick() {
         frameStamps.onPreTick()
