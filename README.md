@@ -2,7 +2,7 @@
 High performance modern render engine for Minecraft
 
 ## Development
-1. Clone both this and [gl-wrapper](https://github.com/Luna5ama/gl-wrapper) to the same directory
+1. Clone both this and [Luna5ama/gl-wrapper](https://github.com/Luna5ama/gl-wrapper) to the same directory
 2. Open project in this repository
 
 ## Features (aka TODO list)
