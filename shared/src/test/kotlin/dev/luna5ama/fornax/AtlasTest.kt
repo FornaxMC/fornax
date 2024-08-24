@@ -2,10 +2,10 @@ package dev.luna5ama.fornax
 
 import dev.fastmc.common.TickTimer
 import dev.luna5ama.fornax.data.ResourceReference
+import dev.luna5ama.glwrapper.*
 import dev.luna5ama.glwrapper.api.*
-import dev.luna5ama.glwrapper.impl.ShaderProgram
-import dev.luna5ama.glwrapper.impl.ShaderSource
-import dev.luna5ama.glwrapper.impl.VertexArrayObject
+import dev.luna5ama.glwrapper.enums.FilterMode
+import dev.luna5ama.glwrapper.objects.VertexArrayObject
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import org.lwjgl.glfw.GLFW.*
@@ -35,6 +35,7 @@ object AtlasTest {
 
         glfwSwapInterval(0)
 
+        Thread.sleep(1000)
         println("A")
         val instance = Instance()
         println("B")
@@ -53,33 +54,40 @@ object AtlasTest {
     class Instance {
         private val modInstance = ModInstance()
         private val shader = ShaderProgram(
-            ShaderSource.Vert("/Blit.vert"),
-            ShaderSource.Frag("/Blit.frag")
+            ShaderSource.Vert("Blit.vert"),
+            ShaderSource.Frag("Blit.frag")
         )
         private val dummyVao = VertexArrayObject().apply {
             create()
         }
 
         private val timer = TickTimer()
+        private val gcTimer = TickTimer()
 
         private val handle: Long
 
         init {
-            File("test\\AVPBR Retexture R2\\assets\\minecraft\\textures\\block").listFiles()!!.asSequence()
+//            File("test\\AVPBR Retexture R2\\assets\\minecraft\\textures\\block").listFiles()!!
+            File("test\\SPBR-15_1\\assets\\minecraft\\textures\\block").listFiles()!!
+                .asSequence()
                 .filter { it.extension == "png" }
                 .forEach {
                     modInstance.textureManager.registerSprite(ResourceReference("textures/block/${it.nameWithoutExtension}"))
                 }
-            handle = glGetTextureSamplerHandleARB(modInstance.textureManager.atlas.textureObject.id, modInstance.samplers.nearest.id)
+            handle = glGetTextureSamplerHandleARB(
+                modInstance.textureManager.atlas.textureObject.id,
+                modInstance.samplerManager.get {
+                    minFilter(FilterMode.Nearest)
+                    magFilter(FilterMode.Nearest)
+                }.id
+            )
             glMakeTextureHandleResidentARB(handle)
         }
 
         suspend fun render() {
             coroutineScope {
-                if (timer.tickAndReset(5)) {
-                    modInstance.onPreTick()
-                    modInstance.onPostTick()
-                }
+                modInstance.onPreTick()
+                modInstance.onPostTick()
 
                 modInstance.onPreRender()
 
@@ -96,7 +104,7 @@ object AtlasTest {
                 glEnable(GL_BLEND)
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-                shader.uniformHandleui64("uTex1", handle)
+                shader.uniformHandle("uTex1", handle)
                 dummyVao.bind()
                 shader.bind()
                 glDrawArrays(GL_TRIANGLES, 0, 6)

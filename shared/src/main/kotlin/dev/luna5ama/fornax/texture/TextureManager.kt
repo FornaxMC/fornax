@@ -1,5 +1,6 @@
 package dev.luna5ama.fornax.texture
 
+import dev.fastmc.common.TickTimer
 import dev.fastmc.common.pollEach
 import dev.luna5ama.fornax.IUpdateListener
 import dev.luna5ama.fornax.ModInstance
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.CoroutineContext
 
 class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.Impl(), IUpdateListener {
@@ -23,6 +25,8 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
     private val animatedSprites = CopyOnWriteArrayList<TextureSprite>()
     private val pendingSprites = ConcurrentLinkedQueue<ResourceReference>()
     private var tickCounter = 0L
+    private val printTimer = TickTimer()
+    private val updateCounter = AtomicInteger()
 
     private val pendingUpdates = Channel<TextureSprite.PendingUpdateData>(Channel.UNLIMITED)
 
@@ -76,6 +80,10 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
                 update.dataBufferBlock.offset
             )
             update = pendingUpdates.tryReceive().getOrNull()
+            updateCounter.incrementAndGet()
+        }
+        if (printTimer.tickAndReset(3000)) {
+            println("Updates: %,d".format(updateCounter.getAndSet(0)))
         }
     }
 }

@@ -11,7 +11,7 @@ class TestPathResolver : PathResolver {
         get() = 1
 
     override fun resolve(ref: ResourceReference): URI? {
-        return File("test\\AVPBR Retexture R2\\assets\\minecraft\\${ref.path}").toURI()
+        return File("test\\SPBR-15_1\\assets\\minecraft\\${ref.path}").toURI()
     }
 
 }
