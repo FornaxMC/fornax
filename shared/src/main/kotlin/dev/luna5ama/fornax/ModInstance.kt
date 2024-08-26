@@ -11,32 +11,26 @@ import kotlin.coroutines.CoroutineContext
 class ModInstance : IGLObjContainer by IGLObjContainer.Impl(), IUpdateListener {
     val globalScope = CoroutineScope(Dispatchers.Default)
     val samplerManager = register(SamplerManager())
-    val frameStamps = FrameStamps()
+    val mainGPUFence = GPUFence()
     val terrainRenderer = register(TerrainRenderer())
     val textureManager = register(TextureManager(this))
     val globalUploadBuffer =
-        register(PersistentRingBuffer(1024L * 1024 * 1024 * 2, frameStamps, GL_MAP_COHERENT_BIT or GL_MAP_WRITE_BIT))
+        register(PersistentRingBuffer(30, GL_MAP_COHERENT_BIT or GL_MAP_WRITE_BIT))
 
     override suspend fun onPreTick() {
-        frameStamps.onPreTick()
         textureManager.onPreTick()
         coroutineScope {
             val mainContext = this.coroutineContext
             launch(Dispatchers.Default) {
-                frameStamps.onPreTickParallel(mainContext)
                 textureManager.onPreTickParallel(mainContext)
             }
         }
     }
 
     override suspend fun onPostTick() {
-        frameStamps.onPostTick()
         textureManager.onPostTick()
         coroutineScope {
             val mainContext = this.coroutineContext
-            launch(Dispatchers.Default) {
-                frameStamps.onPostTickParallel(mainContext)
-            }
             launch(Dispatchers.Default) {
                 textureManager.onPostTickParallel(mainContext)
             }
@@ -44,14 +38,10 @@ class ModInstance : IGLObjContainer by IGLObjContainer.Impl(), IUpdateListener {
     }
 
     override suspend fun onPreRender() {
-        frameStamps.onPreRender()
         textureManager.onPreRender()
-        globalUploadBuffer.update()
+        globalUploadBuffer.tryUpdate()
         coroutineScope {
             val mainContext = this.coroutineContext
-            launch(Dispatchers.Default) {
-                frameStamps.onPreRenderParallel(mainContext)
-            }
             launch(Dispatchers.Default) {
                 textureManager.onPreRenderParallel(mainContext)
             }
@@ -59,13 +49,10 @@ class ModInstance : IGLObjContainer by IGLObjContainer.Impl(), IUpdateListener {
     }
 
     override suspend fun onPostRender() {
-        frameStamps.onPostRender()
+        mainGPUFence.update()
         textureManager.onPostRender()
         coroutineScope {
             val mainContext = this.coroutineContext
-            launch(Dispatchers.Default) {
-                frameStamps.onPostRenderParallel(mainContext)
-            }
             launch(Dispatchers.Default) {
                 textureManager.onPostRenderParallel(mainContext)
             }

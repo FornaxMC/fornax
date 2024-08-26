@@ -16,7 +16,8 @@ class OpenConcurrentLinkedQueueTest {
     }
 
     private class TestInstance {
-        val queue = OpenConcurrentLinkedQueue(Foo(0), Foo::class.java.getDeclaredField("next"))
+        val dummyObject = Foo(0)
+        val queue = OpenConcurrentLinkedQueue(dummyObject, Foo::class.java.getDeclaredField("next"))
         val set = Collections.newSetFromMap<Foo>(ConcurrentHashMap())
         val total = AtomicInteger()
 
@@ -200,7 +201,7 @@ class OpenConcurrentLinkedQueueTest {
                 repeat(perThread) {
                     val foo = Foo(counter.getAndIncrement())
                     while (!instance.queue.enqueueConditional(foo) {
-                        it == null && foo.v == 0 || it != null && it.v + 1 == foo.v
+                        it === instance.dummyObject && foo.v == 0 || it !== instance.dummyObject && it.v + 1 == foo.v
                     }) {
                         // retry
                     }

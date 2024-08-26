@@ -4,6 +4,10 @@ import dev.luna5ama.fornax.data.ResourceReference
 import dev.luna5ama.fornax.data.STexture
 import dev.luna5ama.fornax.opengl.PersistentRingBuffer
 import dev.luna5ama.kmogus.memcpy
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
 import java.io.FileNotFoundException
 import java.lang.ref.SoftReference
@@ -73,47 +77,45 @@ data class TextureSprite(val ref: ResourceReference) {
         return data
     }
 
-    suspend fun getFrame(buffer: PersistentRingBuffer, tickIndex: Long): Sequence<PendingUpdateData> {
-        val textureData = loadTextureData()
-        if (animationMeta == null) {
-            return textureData.images.asSequence()
-                .mapIndexed { level, it ->
+    suspend fun getFrame(buffer: PersistentRingBuffer, tickIndex: Long): Flow<PendingUpdateData> {
+        return flow {
+            val textureData = loadTextureData()
+            if (animationMeta == null) {
+                textureData.images.forEachIndexed { level, it ->
                     val mipLevelSize = it.data.len
                     val block = buffer.allocate(mipLevelSize)
                     memcpy(it.data.ptr, 0L, block.ptr, 0L, mipLevelSize)
-                    PendingUpdateData(textureData, this, level, it.width, block)
+                    emit(PendingUpdateData(textureData, this@TextureSprite, level, it.width, block))
                 }
-        } else {
-            val frameTime = tickIndex / animationMeta.frametime
-            val totalFrames = textureData.height / textureData.width
+            } else {
+                val frameTime = tickIndex / animationMeta.frametime
+                val totalFrames = textureData.height / textureData.width
 
-            fun getFrameYIndex(frameTime: Long): Int {
-                return if (animationMeta.frames == null) {
-                    (frameTime % totalFrames).toInt()
-                } else {
-                    animationMeta.frames[(frameTime % animationMeta.frames.size).toInt()]
+                fun getFrameYIndex(frameTime: Long): Int {
+                    return if (animationMeta.frames == null) {
+                        (frameTime % totalFrames).toInt()
+                    } else {
+                        animationMeta.frames[(frameTime % animationMeta.frames.size).toInt()]
+                    }
                 }
-            }
 
-            if (!animationMeta.interpolate) {
-                val yIndex = getFrameYIndex(frameTime)
-                return textureData.images.asSequence()
-                    .mapIndexed { level, it ->
+                if (!animationMeta.interpolate) {
+                    val yIndex = getFrameYIndex(frameTime)
+                    textureData.images.forEachIndexed { level, it ->
                         val mipLevelSize = it.width.toLong() * it.width * it.channels
                         val block = buffer.allocate(mipLevelSize)
                         val offset = yIndex.toLong() * it.width * it.width * it.channels
                         memcpy(it.data.ptr, offset, block.ptr, 0L, mipLevelSize)
-                        PendingUpdateData(textureData, this, level, it.width, block)
+                        emit(PendingUpdateData(textureData, this@TextureSprite, level, it.width, block))
                     }
-            } else {
-                val frameTimeD = tickIndex.toDouble() / animationMeta.frametime
-                val yIndex1 = getFrameYIndex(floor(frameTimeD).toLong())
-                val yIndex2 = getFrameYIndex(ceil(frameTimeD).toLong())
-                val mixRatio = frameTimeD - floor(frameTimeD)
-                val mul2 = (mixRatio * MIX_MUL).toInt()
-                val mul1 = MIX_MUL - mul2
-                return textureData.images.asSequence()
-                    .mapIndexed { level, it ->
+                } else {
+                    val frameTimeD = tickIndex.toDouble() / animationMeta.frametime
+                    val yIndex1 = getFrameYIndex(floor(frameTimeD).toLong())
+                    val yIndex2 = getFrameYIndex(ceil(frameTimeD).toLong())
+                    val mixRatio = frameTimeD - floor(frameTimeD)
+                    val mul2 = (mixRatio * MIX_MUL).toInt()
+                    val mul1 = MIX_MUL - mul2
+                    textureData.images.forEachIndexed { level, it ->
                         val mipLevelSize = it.width.toLong() * it.width * it.channels
                         val block = buffer.allocate(mipLevelSize)
                         val offset1 = yIndex1.toLong() * it.width * it.width * it.channels
@@ -131,10 +133,11 @@ data class TextureSprite(val ref: ResourceReference) {
                             readPtr2++
                             writePtr++
                         }
-                        PendingUpdateData(textureData, this, level, it.width, block)
+                        emit(PendingUpdateData(textureData, this@TextureSprite, level, it.width, block))
                     }
+                }
             }
-        }
+        }.flowOn(Dispatchers.Default)
     }
 
     companion object {

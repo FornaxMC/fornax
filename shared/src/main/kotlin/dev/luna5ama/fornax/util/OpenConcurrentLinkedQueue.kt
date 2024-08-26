@@ -26,14 +26,51 @@ class OpenConcurrentLinkedQueue<E>(private val dummyObject: E, nextField: Field)
     val size: Int
         get() = sizeCounter.get()
 
-    fun enqueueConditional(e: E, predicate: (E?) -> Boolean): Boolean {
+    fun peekHead(): E? {
+        var head: E
+        var tail: E
+        var next: E?
+        do {
+            head = headRef
+            tail = tailRef
+            next = head.next
+            if (head === headRef) {
+                if (head === tail) {
+                    if (next === null) {
+                        return null
+                    }
+                    casTail(tail, next)
+                } else {
+                    return next
+                }
+            }
+        } while (true)
+    }
+
+    fun peekTail(): E? {
+        var tail: E
+        var next: E?
+        do {
+            tail = tailRef
+            next = tail.next
+            if (tail === tailRef) {
+                if (next === null) {
+                    return tail
+                } else {
+                    casTail(tail, next)
+                }
+            }
+        } while (true)
+    }
+
+    fun enqueueConditional(e: E, predicate: (E) -> Boolean): Boolean {
         var tail: E
         do {
             tail = tailRef
             val next = tail.next
             if (tail === tailRef) {
                 if (next === null) {
-                    if (!predicate(tail.takeIf { it !== dummyObject })) {
+                    if (!predicate(tail)) {
                         return false
                     }
                     if (tail.casNext(next, e)) {

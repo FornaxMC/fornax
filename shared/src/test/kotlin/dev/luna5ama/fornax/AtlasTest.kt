@@ -2,11 +2,14 @@ package dev.luna5ama.fornax
 
 import dev.fastmc.common.TickTimer
 import dev.luna5ama.fornax.data.ResourceReference
-import dev.luna5ama.glwrapper.*
+import dev.luna5ama.glwrapper.ShaderProgram
+import dev.luna5ama.glwrapper.ShaderSource
 import dev.luna5ama.glwrapper.api.*
 import dev.luna5ama.glwrapper.enums.FilterMode
 import dev.luna5ama.glwrapper.objects.VertexArrayObject
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.GL
@@ -27,8 +30,8 @@ object AtlasTest {
         glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, 1)
         glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE)
 
-//        val window = glfwCreateWindow(1280, 720, "OpenGL", 0, 0)
-        val window = glfwCreateWindow(2048, 1024, "OpenGL", 0, 0)
+        val window = glfwCreateWindow(1024, 1024, "OpenGL", 0, 0)
+//        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE)
 
         glfwMakeContextCurrent(window)
         GL.createCapabilities()
@@ -67,13 +70,7 @@ object AtlasTest {
         private val handle: Long
 
         init {
-//            File("test\\AVPBR Retexture R2\\assets\\minecraft\\textures\\block").listFiles()!!
-            File("test\\SPBR-15_1\\assets\\minecraft\\textures\\block").listFiles()!!
-                .asSequence()
-                .filter { it.extension == "png" }
-                .forEach {
-                    modInstance.textureManager.registerSprite(ResourceReference("textures/block/${it.nameWithoutExtension}"))
-                }
+
             handle = glGetTextureSamplerHandleARB(
                 modInstance.textureManager.atlas.textureObject.id,
                 modInstance.samplerManager.get {
@@ -84,10 +81,30 @@ object AtlasTest {
             glMakeTextureHandleResidentARB(handle)
         }
 
+        private val stuff =
+            //            File("test\\AVPBR Retexture R2\\assets\\minecraft\\textures\\block").listFiles()!!
+            File("test\\SPBR-15_1\\assets\\minecraft\\textures\\block").listFiles()!!
+                .asSequence()
+                .filter { it.extension == "png" }
+                .map { ResourceReference("textures/block/${it.nameWithoutExtension}") }
+                .map {
+                    modInstance.textureManager.registerSprite(it)
+                }
+                .toList()
+
+        init {
+            modInstance.globalScope.launch {
+                stuff.awaitAll()
+                modInstance.textureManager.updateAnimation = true
+            }
+        }
+
         suspend fun render() {
             coroutineScope {
-                modInstance.onPreTick()
-                modInstance.onPostTick()
+                if (timer.tickAndReset(5)) {
+                    modInstance.onPreTick()
+                    modInstance.onPostTick()
+                }
 
                 modInstance.onPreRender()
 
