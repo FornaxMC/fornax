@@ -8,14 +8,27 @@ import dev.luna5ama.glwrapper.api.GL_MAP_WRITE_BIT
 import kotlinx.coroutines.*
 import kotlin.coroutines.CoroutineContext
 
-class ModInstance : IGLObjContainer by IGLObjContainer.Impl(), IUpdateListener {
+class ModInstance(
+    glContextInitializer: BackgroundGL.GLContextInitializer
+) : IGLObjContainer by IGLObjContainer.Impl(), IUpdateListener {
     val globalScope = CoroutineScope(Dispatchers.Default)
+    val backgroundGL = BackgroundGL(glContextInitializer)
     val samplerManager = register(SamplerManager())
     val mainGPUFence = GPUFence()
+    val backgroundGPUFence = GPUFence()
     val terrainRenderer = register(TerrainRenderer())
     val textureManager = register(TextureManager(this))
     val globalUploadBuffer =
         register(PersistentRingBuffer(30, GL_MAP_COHERENT_BIT or GL_MAP_WRITE_BIT))
+
+    init {
+        backgroundGL.scope.launch {
+            while (true) {
+                backgroundGPUFence.update()
+                delay(50L)
+            }
+        }
+    }
 
     override suspend fun onPreTick() {
         textureManager.onPreTick()

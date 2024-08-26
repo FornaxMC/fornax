@@ -55,7 +55,7 @@ object AtlasTest {
     }
 
     class Instance {
-        private val modInstance = ModInstance()
+        private val modInstance = ModInstance(GLContextInitializerLWJGL3())
         private val shader = ShaderProgram(
             ShaderSource.Vert("Blit.vert"),
             ShaderSource.Frag("Blit.frag")
@@ -101,7 +101,7 @@ object AtlasTest {
 
         suspend fun render() {
             coroutineScope {
-                if (timer.tickAndReset(5)) {
+                if (timer.tickAndReset(50)) {
                     modInstance.onPreTick()
                     modInstance.onPostTick()
                 }

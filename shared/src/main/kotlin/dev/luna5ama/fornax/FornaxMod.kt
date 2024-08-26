@@ -12,7 +12,7 @@ object FornaxMod {
         if (::instance.isInitialized) {
             instance.destroy()
         }
-        instance = ModInstance()
+//        instance = ModInstance()
 
         try {
             File("fornax/config.properties").inputStream().use {

@@ -6,12 +6,12 @@ import dev.luna5ama.fornax.ModInstance
 import dev.luna5ama.fornax.data.ResourceReference
 import dev.luna5ama.fornax.opengl.IGLObjContainer
 import dev.luna5ama.fornax.opengl.register
-import dev.luna5ama.fornax.util.sendTo
 import dev.luna5ama.glwrapper.enums.ImageFormat
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
@@ -26,7 +26,6 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
     private val printTimer = TickTimer()
     private val updateCounter = AtomicInteger()
 
-    private val pendingUpdates = Channel<TextureSprite.PendingUpdateData>(Channel.UNLIMITED)
     var updateAnimation = false
 
     fun registerSprite(ref: ResourceReference): Deferred<TextureSprite> {
@@ -38,7 +37,7 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
                     animatedSprites.add(sprite)
                 }
                 launch {
-                    sprite.getFrame(mod.globalUploadBuffer, counter).sendTo(pendingUpdates)
+                    processUpdate(sprite.getFrame(mod.globalUploadBuffer, counter))
                 }
                 sprite
             }
@@ -50,35 +49,35 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
         val counter = tickCounter++
         animatedSprites.forEach { sprite ->
             mod.globalScope.launch {
-                sprite.getFrame(mod.globalUploadBuffer, counter).sendTo(pendingUpdates)
+                processUpdate(sprite.getFrame(mod.globalUploadBuffer, counter))
+            }
+        }
+    }
+
+    private suspend fun processUpdate(flow: Flow<TextureSprite.PendingUpdateData>) {
+        withContext(mod.backgroundGL.scope.coroutineContext) {
+            flow.collect { update ->
+                var atlasBlock = update.sprite.getAtlasBlock(update.level)
+                if (atlasBlock == null || atlasBlock.size < update.imageSize) {
+                    atlasBlock?.free()
+                    atlasBlock = atlas.allocate(update.imageSize) ?: error("Failed to allocate atlas block")
+                    update.sprite.registerAtlasBlock(update.level, atlasBlock)
+                }
+                atlasBlock.invalidate()
+                atlasBlock.upload(
+                    update.glFormat,
+                    update.glDataType,
+                    update.dataBufferBlock.bufferObject,
+                    update.dataBufferBlock.offset
+                )
+                updateCounter.incrementAndGet()
+                mod.backgroundGPUFence.awaitGPU()
+                update.dataBufferBlock.free()
             }
         }
     }
 
     override suspend fun onPreRender() {
-        var update = pendingUpdates.tryReceive().getOrNull()
-        while (update != null) {
-            var atlasBlock = update.sprite.getAtlasBlock(update.level)
-            if (atlasBlock == null || atlasBlock.size < update.imageSize) {
-                atlasBlock?.free()
-                atlasBlock = atlas.allocate(update.imageSize) ?: error("Failed to allocate atlas block")
-                update.sprite.registerAtlasBlock(update.level, atlasBlock)
-            }
-            atlasBlock.invalidate()
-            atlasBlock.upload(
-                update.glFormat,
-                update.glDataType,
-                update.dataBufferBlock.bufferObject,
-                update.dataBufferBlock.offset
-            )
-            val dataBufferBlock = update.dataBufferBlock
-            mod.globalScope.launch {
-                mod.mainGPUFence.awaitGPU()
-                dataBufferBlock.free()
-            }
-            update = pendingUpdates.tryReceive().getOrNull()
-            updateCounter.incrementAndGet()
-        }
         if (printTimer.tickAndReset(3000)) {
             println("Updates: %,d".format(updateCounter.getAndSet(0)))
         }
