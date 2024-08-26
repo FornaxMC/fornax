@@ -51,7 +51,7 @@ subprojects {
     tasks {
         test {
             useJUnitPlatform()
-            jvmArgs("-Xmx2G")
+            jvmArgs("-Xmx4G")
         }
         withType<KotlinCompile> {
             kotlinOptions {
