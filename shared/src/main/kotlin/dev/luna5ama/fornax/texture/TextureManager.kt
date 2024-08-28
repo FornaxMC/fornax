@@ -15,6 +15,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.CoroutineContext
 
 class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.Impl(), IUpdateListener {
+    private val coroutineScope =
+        CoroutineScope(mod.baseCoroutineScope.coroutineContext + CoroutineName("TextureManager"))
     val atlas = register(VirtualTextureAtlas(ImageFormat.R8_G8_B8_A8_UN))
     private val sprites0 = ConcurrentHashMap<ResourceReference, TextureSprite>()
     val sprites: Map<ResourceReference, TextureSprite> get() = sprites0
@@ -27,16 +29,14 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
 
     fun registerSprite(ref: ResourceReference): Deferred<TextureSprite> {
         val counter = tickCounter
-        return mod.globalScope.async {
+        return coroutineScope.async {
             val outerScope = this
             sprites0.computeIfAbsent(ref) {
                 val sprite = TextureSprite(it)
                 if (sprite.animationMeta != null) {
                     animatedSprites.add(sprite)
                 }
-                launch {
-                    processUpdate(outerScope, sprite.getFrame(mod.globalUploadBuffer, counter))
-                }
+                processUpdate(outerScope, sprite.getFrame(mod.globalUploadBuffer, counter))
                 sprite
             }
         }
@@ -45,36 +45,36 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
     override suspend fun onPostTickParallel(mainContext: CoroutineContext) {
         if (!updateAnimation) return
         val counter = tickCounter++
-        mod.globalScope.launch {
+        coroutineScope.launch {
             val outerScope = this
             animatedSprites.forEach { sprite ->
-                launch {
-                    processUpdate(outerScope, sprite.getFrame(mod.globalUploadBuffer, counter))
-                }
+                processUpdate(outerScope, sprite.getFrame(mod.globalUploadBuffer, counter))
             }
         }
     }
 
-    private suspend fun processUpdate(outerScope: CoroutineScope, flow: Flow<TextureSprite.PendingUpdateData>) {
-        withContext(mod.backgroundGL.scope.coroutineContext) {
-            flow.collect { update ->
-                var atlasBlock = update.sprite.getAtlasBlock(update.level)
-                if (atlasBlock == null || atlasBlock.size < update.imageSize) {
-                    atlasBlock?.free()
-                    atlasBlock = atlas.allocate(update.imageSize) ?: error("Failed to allocate atlas block")
-                    update.sprite.registerAtlasBlock(update.level, atlasBlock)
-                }
-                atlasBlock.invalidate()
-                atlasBlock.upload(
-                    update.glFormat,
-                    update.glDataType,
-                    update.dataBufferBlock.bufferObject,
-                    update.dataBufferBlock.offset
-                )
-                updateCounter.incrementAndGet()
-                outerScope.launch {
-                    mod.backgroundGPUFence.awaitGPU()
-                    update.dataBufferBlock.free()
+    private fun processUpdate(outerScope: CoroutineScope, flow: Flow<TextureSprite.PendingUpdateData>) {
+        outerScope.launch {
+            withContext(mod.backgroundGL.coroutineScope.coroutineContext) {
+                flow.collect { update ->
+                    var atlasBlock = update.sprite.getAtlasBlock(update.level)
+                    if (atlasBlock == null || atlasBlock.size < update.imageSize) {
+                        atlasBlock?.free()
+                        atlasBlock = atlas.allocate(update.imageSize) ?: error("Failed to allocate atlas block")
+                        update.sprite.registerAtlasBlock(update.level, atlasBlock)
+                    }
+                    atlasBlock.invalidate()
+                    atlasBlock.upload(
+                        update.glFormat,
+                        update.glDataType,
+                        update.dataBufferBlock.bufferObject,
+                        update.dataBufferBlock.offset
+                    )
+                    updateCounter.incrementAndGet()
+                    outerScope.launch {
+                        mod.backgroundGL.gpuFence.awaitGPU()
+                        update.dataBufferBlock.free()
+                    }
                 }
             }
         }

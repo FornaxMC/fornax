@@ -7,10 +7,7 @@ import dev.luna5ama.glwrapper.ShaderSource
 import dev.luna5ama.glwrapper.api.*
 import dev.luna5ama.glwrapper.enums.FilterMode
 import dev.luna5ama.glwrapper.objects.VertexArrayObject
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.GL
 import java.io.File
@@ -93,7 +90,7 @@ object AtlasTest {
                 .toList()
 
         init {
-            modInstance.globalScope.launch {
+            modInstance.baseCoroutineScope.launch {
                 stuff.awaitAll()
                 modInstance.textureManager.updateAnimation = true
             }

@@ -77,7 +77,7 @@ data class TextureSprite(val ref: ResourceReference) {
         return data
     }
 
-    suspend fun getFrame(buffer: PersistentRingBuffer, tickIndex: Long): Flow<PendingUpdateData> {
+    fun getFrame(buffer: PersistentRingBuffer, tickIndex: Long): Flow<PendingUpdateData> {
         return flow {
             val textureData = loadTextureData()
             if (animationMeta == null) {
