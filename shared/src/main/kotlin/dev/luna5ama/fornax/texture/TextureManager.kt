@@ -5,12 +5,13 @@ import dev.luna5ama.fornax.IUpdateListener
 import dev.luna5ama.fornax.ModInstance
 import dev.luna5ama.fornax.data.ResourceReference
 import dev.luna5ama.fornax.opengl.IGLObjContainer
+import dev.luna5ama.fornax.opengl.PersistentRingBuffer
 import dev.luna5ama.fornax.opengl.register
 import dev.luna5ama.glwrapper.enums.ImageFormat
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.*
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.CoroutineContext
 
@@ -20,23 +21,26 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
     val atlas = register(VirtualTextureAtlas(ImageFormat.R8_G8_B8_A8_UN))
     private val sprites0 = ConcurrentHashMap<ResourceReference, TextureSprite>()
     val sprites: Map<ResourceReference, TextureSprite> get() = sprites0
-    private val animatedSprites = CopyOnWriteArrayList<TextureSprite>()
     private var tickCounter = 0L
     private val printTimer = TickTimer()
     private val updateCounter = AtomicInteger()
+    private val animationUpdates = MutableSharedFlow<Long>(replay = 2, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     var updateAnimation = false
 
     fun registerSprite(ref: ResourceReference): Deferred<TextureSprite> {
         val counter = tickCounter
         return coroutineScope.async {
-            val outerScope = this
             sprites0.computeIfAbsent(ref) {
                 val sprite = TextureSprite(it)
                 if (sprite.animationMeta != null) {
-                    animatedSprites.add(sprite)
+                    animationUpdates.onEach { tick2 ->
+                        processUpdate(sprite.getFrame(mod.globalUploadBuffer, tick2))
+                    }.launchIn(coroutineScope)
                 }
-                processUpdate(outerScope, sprite.getFrame(mod.globalUploadBuffer, counter))
+                launch {
+                    processUpdate(sprite.getFrame(mod.globalUploadBuffer, counter))
+                }
                 sprite
             }
         }
@@ -45,16 +49,11 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
     override suspend fun onPostTickParallel(mainContext: CoroutineContext) {
         if (!updateAnimation) return
         val counter = tickCounter++
-        coroutineScope.launch {
-            val outerScope = this
-            animatedSprites.forEach { sprite ->
-                processUpdate(outerScope, sprite.getFrame(mod.globalUploadBuffer, counter))
-            }
-        }
+        animationUpdates.tryEmit(counter)
     }
 
-    private fun processUpdate(outerScope: CoroutineScope, flow: Flow<TextureSprite.PendingUpdateData>) {
-        outerScope.launch {
+    private suspend fun processUpdate(flow: Flow<TextureSprite.PendingUpdateData>) {
+            val blocks = mutableListOf<PersistentRingBuffer.Block>()
             withContext(mod.backgroundGL.coroutineScope.coroutineContext) {
                 flow.collect { update ->
                     var atlasBlock = update.sprite.getAtlasBlock(update.level)
@@ -70,19 +69,19 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
                         update.dataBufferBlock.bufferObject,
                         update.dataBufferBlock.offset
                     )
-                    updateCounter.incrementAndGet()
-                    outerScope.launch {
-                        mod.backgroundGL.gpuFence.awaitGPU()
-                        update.dataBufferBlock.free()
-                    }
+                    blocks.add(update.dataBufferBlock)
+                coroutineScope.launch {
+                    mod.backgroundGL.gpuFence.awaitGPU()
+                    update.dataBufferBlock.free()
+                }
                 }
             }
-        }
+            updateCounter.incrementAndGet()
     }
 
     override suspend fun onPreRender() {
         if (printTimer.tickAndReset(3000)) {
-            println("Updates: %,d".format(updateCounter.getAndSet(0)))
+            println("Updates: %,d".format(updateCounter.getAndSet(0) / 3 / animationUpdates.subscriptionCount.value))
         }
     }
 }

@@ -3,27 +3,24 @@ package dev.luna5ama.fornax.opengl
 import dev.luna5ama.fornax.ModInstance
 import dev.luna5ama.fornax.util.CustomCoroutineScope
 import kotlinx.coroutines.CoroutineName
-import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.ThreadFactory
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
 
-class BackgroundGL(mod: ModInstance, glContextInitializer: GLContextInitializer) {
+class BackgroundGL(mod: ModInstance, private val glContextInitializer: GLContextInitializer) {
     val coroutineScope = CustomCoroutineScope(
         mod.baseCoroutineScope.coroutineContext + CoroutineName("BackgroundGL"),
-        ThreadPoolExecutor(
+        ScheduledThreadPoolExecutor(
             1,
-            1,
-            0L,
-            TimeUnit.MILLISECONDS,
-            LinkedBlockingQueue(),
-            ThreadFactory { Thread(it, "BackgroundGL") }
+            ThreadFactory { Thread(initializeThread(it), "BackgroundGL").apply { priority = Thread.MAX_PRIORITY } }
         )
     )
     val gpuFence = GPUFence()
 
-    init {
-        coroutineScope.executor.submit(glContextInitializer::initGLContext).get()
+    private fun initializeThread(runnable: Runnable): Runnable {
+        return Runnable {
+            glContextInitializer.initGLContext()
+            runnable.run()
+        }
     }
 
     interface GLContextInitializer {

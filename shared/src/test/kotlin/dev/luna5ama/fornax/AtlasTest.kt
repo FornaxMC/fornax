@@ -35,7 +35,6 @@ object AtlasTest {
 
         glfwSwapInterval(0)
 
-        Thread.sleep(1000)
         println("A")
         val instance = Instance()
         println("B")
