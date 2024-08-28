@@ -1,14 +1,16 @@
 package dev.luna5ama.fornax.opengl
 
 import dev.fastmc.common.pollEach
-import dev.luna5ama.fornax.util.OpenConcurrentLinkedQueue
 import dev.luna5ama.glwrapper.api.GL_MAP_PERSISTENT_BIT
 import dev.luna5ama.glwrapper.api.GL_MAP_UNSYNCHRONIZED_BIT
 import dev.luna5ama.glwrapper.objects.BufferObject
+import dev.luna5ama.kmogus.Ptr
+import java.util.*
 import java.util.concurrent.ConcurrentLinkedDeque
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.locks.ReentrantLock
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.suspendCoroutine
 
@@ -27,43 +29,44 @@ class PersistentRingBuffer(capacity2Pow: Int, frag: Int) :
         check(mapped.ptr.address != 0L) { "Failed to map buffer" }
     }
 
-    private val dummyObject = Block(0, 0, 0)
-    private val allocatedBlocks = OpenConcurrentLinkedQueue(dummyObject, Block::class.java.getDeclaredField("next"))
     private val allocateOffset = AtomicLong(0)
     private val freeOffset = AtomicLong(capacity)
-    private val awaiting = ConcurrentLinkedDeque<Continuation<Unit>>()
-    private val updateLock = ReentrantLock()
+    private val awaiting = ConcurrentLinkedDeque<Pair<Long, Continuation<Unit>>>()
 
-    fun tryUpdate(): Boolean {
-        if (!updateLock.tryLock()) return false
-        try {
-            var freed = false
-            var block = allocatedBlocks.peekHead()
-            while (block != null) {
-                if (!block.free) break
-                if (allocatedBlocks.size == 1) break
-                val newFreeOffset = block.rawStartOffset + capacity
+    private val frameRWLock = ReentrantReadWriteLock()
+    @Volatile
+    private var currentFrame = AllocationFrame(0L)
+    private val allocatedFrames = ArrayDeque<AllocationFrame>()
 
-                freed = true
-                freeOffset.set(newFreeOffset)
-
-                val last = allocatedBlocks.dequeue()
-                assert(last == block)
-                assert(last != null)
-                block = allocatedBlocks.peekHead()
-                assert(block == null || last!!.rawWriteOffset + last.size == block.rawStartOffset)
-            }
-            if (freed) {
-                val currentTail = awaiting.peekLast()
-                awaiting.pollEach {
-                    it.resumeWith(Result.success(Unit))
-                    if (it === currentTail) return true
-                }
-            }
-        } finally {
-            updateLock.unlock()
+    fun update() {
+        frameRWLock.write {
+            val lastFrame = currentFrame
+            if (lastFrame.allocated.get() == 0L) return@write
+            allocatedFrames.add(lastFrame)
+            currentFrame = AllocationFrame(lastFrame.startOffset + lastFrame.allocated.get())
         }
-        return true
+
+        var frame = allocatedFrames.peekFirst()
+        while (frame != null) {
+            val frameAllocated = frame.allocated.get()
+            assert(frameAllocated > 0L)
+            assert(frame.startOffset < freeOffset.get())
+            if (frameAllocated > frame.freed.get()) break
+
+            freeOffset.getAndAdd(frameAllocated)
+
+            allocatedFrames.pollFirst()
+            frame = allocatedFrames.peekFirst()
+        }
+
+        var freed = freeOffset.get() - allocateOffset.get()
+        if (freed > 0L) {
+            awaiting.pollEach { (size, it) ->
+                it.resumeWith(Result.success(Unit))
+                freed -= size
+                if (freed <= 0L) return
+            }
+        }
     }
 
     suspend fun allocate(size: Long): Block {
@@ -71,66 +74,83 @@ class PersistentRingBuffer(capacity2Pow: Int, frag: Int) :
             val block = tryAllocate(size)
             if (block != null) return block
             suspendCoroutine {
-                awaiting.add(it)
+                awaiting.add(size to it)
             }
         }
     }
 
     fun tryAllocate(size: Long): Block? {
-        var oldOffset: Long
-        var writeOffset: Long
-        var newOffset: Long
-        do {
-            oldOffset = allocateOffset.get()
-            writeOffset = oldOffset
-            newOffset = oldOffset + size
-            val newActualOffset = newOffset and capacityMask
-            if (newActualOffset < size) {
-                // Not enough contiguous space at the end, requires padding and wrapping
-                newOffset -= newActualOffset // Padding until the end
-                writeOffset = newOffset // Start from the beginning
-                newOffset += size
-            }
-            if (newOffset > freeOffset.get()) return null
-            assert(oldOffset <= writeOffset || oldOffset > 0 && writeOffset < 0)
-            assert(writeOffset < freeOffset.get())
-        } while (!allocateOffset.compareAndSet(oldOffset, newOffset))
+        require(size > 0) { "Size must be positive" }
 
-        val block = Block(oldOffset, writeOffset, size)
-        while (!allocatedBlocks.enqueueConditional(block) {
-            assert(it === dummyObject || it.rawStartOffset < block.rawStartOffset)
-            it.rawWriteOffset + it.size == block.rawStartOffset
-        }) {
-            // Retry
+        var startOffset: Long
+        var startPadding: Long
+        var endOffset: Long
+
+        val frame = frameRWLock.read {
+            do {
+                startOffset = allocateOffset.get()
+                startPadding = 0L
+                endOffset = startOffset + size
+                val newActualOffset = endOffset and capacityMask
+                if (newActualOffset != 0L && newActualOffset < size) {
+                    // Not enough contiguous space at the end, requires padding and wrapping
+                    endOffset -= newActualOffset
+                    startPadding = endOffset - startOffset // Padding until the end of the buffer
+                    endOffset += size
+                }
+                if (endOffset > freeOffset.get()) return null
+                assert(startOffset >= 0)
+                assert(startOffset < endOffset)
+                assert(startPadding < size)
+                assert(startOffset + startPadding + size == endOffset)
+            } while (!allocateOffset.compareAndSet(startOffset, endOffset))
+            currentFrame.allocated.getAndAdd(startPadding + size)
+            currentFrame
         }
+        assert(frame.startOffset <= startOffset)
+        val block = BlockImpl(frame, startOffset, startPadding, size)
+
         return block
     }
 
-    inner class Block internal constructor(
-        internal val rawStartOffset: Long,
-        internal val rawWriteOffset: Long,
+    interface Block {
+        val offset: Long
         val size: Long
-    ) {
+        val bufferObject: BufferObject
+        val ptr: Ptr
+        fun free()
+    }
+
+    private inner class BlockImpl(
+        val frame: AllocationFrame,
+        startOffset: Long,
+        val startPadding: Long,
+        override val size: Long,
+    ) : Block {
+
+        override val offset = (startOffset + startPadding) and capacityMask
+
+        override val bufferObject: BufferObject
+            get() = this@PersistentRingBuffer.buffer
+
+        override val ptr = mapped.ptr + offset
+
         init {
-            assert(rawStartOffset <= rawWriteOffset || rawStartOffset > 0 && rawWriteOffset < 0)
             assert(offset + size <= capacity)
         }
 
-        private val next: Block? = null
-
-        val offset get() = rawWriteOffset and capacityMask
-
-        val bufferObject: BufferObject
-            get() = this@PersistentRingBuffer.buffer
-
-        val ptr = mapped.ptr + offset
-
         @Volatile
-        internal var free = false
+        private var free = false
 
-        fun free() {
+        override fun free() {
             check(!free) { "Block is already freed" }
             free = true
+            frame.freed.getAndAdd(startPadding + size)
         }
+    }
+
+    private class AllocationFrame(val startOffset: Long) {
+        val allocated = AtomicLong(0)
+        val freed = AtomicLong(0)
     }
 }

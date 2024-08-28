@@ -16,8 +16,6 @@ class GPUFence {
     @Volatile
     private var currentFrame0 = Frame()
 
-    private val currentFrame: Frame get() = lock.read { currentFrame0 }
-
     internal fun update() {
         val last = lock.write {
             val last = currentFrame0
@@ -38,7 +36,7 @@ class GPUFence {
                 frame.continuations.forEach {
                     it.resumeWith(resumeResult)
                 }
-                frames.removeFirst()
+                assert(frames.removeFirst() === frame)
             } else {
                 break
             }
@@ -48,10 +46,10 @@ class GPUFence {
     }
 
     suspend fun awaitGPU() {
-        val frame = currentFrame
-        if (frame.isDone) return
         suspendCoroutine {
-            frame.continuations.add(it)
+            lock.read {
+                currentFrame0.continuations.add(it)
+            }
         }
     }
 

@@ -52,7 +52,7 @@ class ModInstance(
 
     override suspend fun onPreRender() {
         textureManager.onPreRender()
-        globalUploadBuffer.tryUpdate()
+        globalUploadBuffer.update()
         coroutineScope {
             val mainContext = this.coroutineContext
             launch(Dispatchers.Default) {

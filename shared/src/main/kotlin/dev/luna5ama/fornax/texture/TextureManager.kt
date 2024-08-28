@@ -7,11 +7,8 @@ import dev.luna5ama.fornax.data.ResourceReference
 import dev.luna5ama.fornax.opengl.IGLObjContainer
 import dev.luna5ama.fornax.opengl.register
 import dev.luna5ama.glwrapper.enums.ImageFormat
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
@@ -31,13 +28,14 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
     fun registerSprite(ref: ResourceReference): Deferred<TextureSprite> {
         val counter = tickCounter
         return mod.globalScope.async {
+            val outerScope = this
             sprites0.computeIfAbsent(ref) {
                 val sprite = TextureSprite(it)
                 if (sprite.animationMeta != null) {
                     animatedSprites.add(sprite)
                 }
                 launch {
-                    processUpdate(sprite.getFrame(mod.globalUploadBuffer, counter))
+                    processUpdate(outerScope, sprite.getFrame(mod.globalUploadBuffer, counter))
                 }
                 sprite
             }
@@ -47,14 +45,17 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
     override suspend fun onPostTickParallel(mainContext: CoroutineContext) {
         if (!updateAnimation) return
         val counter = tickCounter++
-        animatedSprites.forEach { sprite ->
-            mod.globalScope.launch {
-                processUpdate(sprite.getFrame(mod.globalUploadBuffer, counter))
+        mod.globalScope.launch {
+            val outerScope = this
+            animatedSprites.forEach { sprite ->
+                launch {
+                    processUpdate(outerScope, sprite.getFrame(mod.globalUploadBuffer, counter))
+                }
             }
         }
     }
 
-    private suspend fun processUpdate(flow: Flow<TextureSprite.PendingUpdateData>) {
+    private suspend fun processUpdate(outerScope: CoroutineScope, flow: Flow<TextureSprite.PendingUpdateData>) {
         withContext(mod.backgroundGL.scope.coroutineContext) {
             flow.collect { update ->
                 var atlasBlock = update.sprite.getAtlasBlock(update.level)
@@ -71,8 +72,10 @@ class TextureManager(val mod: ModInstance) : IGLObjContainer by IGLObjContainer.
                     update.dataBufferBlock.offset
                 )
                 updateCounter.incrementAndGet()
-                mod.backgroundGPUFence.awaitGPU()
-                update.dataBufferBlock.free()
+                outerScope.launch {
+                    mod.backgroundGPUFence.awaitGPU()
+                    update.dataBufferBlock.free()
+                }
             }
         }
     }

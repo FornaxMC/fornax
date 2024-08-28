@@ -191,38 +191,6 @@ class OpenConcurrentLinkedQueueTest {
         instance.check()
     }
 
-    @Test
-    fun casSort() {
-        val instance = TestInstance()
-        val counter = AtomicInteger()
-
-        val enqueueThreads = List(nThreads) {
-            Thread {
-                repeat(perThread) {
-                    val foo = Foo(counter.getAndIncrement())
-                    while (!instance.queue.enqueueConditional(foo) {
-                        it === instance.dummyObject && foo.v == 0 || it !== instance.dummyObject && it.v + 1 == foo.v
-                    }) {
-                        // retry
-                    }
-                }
-                instance.total.addAndGet(perThread)
-            }
-        }
-
-        enqueueThreads.startAndJoin()
-
-        var e = instance.queue.dequeue()
-        while (e != null) {
-            instance.set.add(e)
-            val new = instance.queue.dequeue() ?: break
-            assertEquals(e.v + 1, new.v, "e.v + 1 == new.v")
-            e = new
-        }
-
-        instance.check()
-    }
-
     private fun List<Thread>.startAndJoin() {
         onEach {
             it.start()

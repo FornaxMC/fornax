@@ -63,29 +63,6 @@ class OpenConcurrentLinkedQueue<E>(private val dummyObject: E, nextField: Field)
         } while (true)
     }
 
-    fun enqueueConditional(e: E, predicate: (E) -> Boolean): Boolean {
-        var tail: E
-        do {
-            tail = tailRef
-            val next = tail.next
-            if (tail === tailRef) {
-                if (next === null) {
-                    if (!predicate(tail)) {
-                        return false
-                    }
-                    if (tail.casNext(next, e)) {
-                        break
-                    }
-                } else {
-                    casTail(tail, next)
-                }
-            }
-        } while (true)
-        sizeCounter.incrementAndGet()
-        casTail(tail, e)
-        return true
-    }
-
     fun enqueue(e: E) {
         var tail: E
         do {
